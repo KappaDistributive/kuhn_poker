@@ -74,19 +74,25 @@ actions_are_complete(const std::vector<Action>& actions) {
 }
 
 
-int
-calculate_pot(const std::vector<Action>& actions,
+std::pair<int, int>
+calculate_bets(const std::vector<Action>& actions,
               bool verify_actions = true) {
   if (verify_actions && !actions_are_legal(actions)) {
     throw std::runtime_error("Encountered illegal sequence of actions!");
   }
-  int pot{2};  // antees
+  std::pair<int, int> bets = {1, 1};  // antees
+  bool alice_turn{true};
   for (auto action : actions) {
     if (action == Action::bet || action == Action::call) {
-      pot++;
+      if (alice_turn) {
+        std::get<0>(bets)++;
+      } else {
+        std::get<1>(bets)++;
+      }
     }
+    alice_turn = !alice_turn;
   }
-  return pot;
+  return bets;
 }
 
 
@@ -128,7 +134,7 @@ bool alice_won(const std::vector<Action>& actions,
 }
 
 
-int
+std::pair<int, int>
 play_round(const Card& alice_card,
            const Card& bob_card,
            Action(*alice_strategy)
@@ -149,7 +155,15 @@ play_round(const Card& alice_card,
       break;
     }
   }
-  return 0;
+  assert(actions_are_legal(actions));
+  assert(actions_are_complete(actions));
+  auto [alice_bets, bob_bets] = calculate_bets(actions, false);
+
+  if (alice_won(actions, alice_card, bob_card, false)) {
+    return {bob_bets, -bob_bets};
+  } else {
+    return {-alice_bets, alice_bets};
+  }
 }
 // TODO(stefan.mesken): define game
 // TODO(stefan.mesken): logging
