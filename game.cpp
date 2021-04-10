@@ -1,11 +1,22 @@
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <iomanip>
 #include <iostream>
 #include <vector>
+#include <random>
 
 
-namespace {
+namespace  {
+
+
+double random() {
+  static std::default_random_engine random_engine(
+  std::chrono::system_clock::now().time_since_epoch().count());
+  static std::uniform_real_distribution<double> distribution(0., 1.);
+
+  return distribution(random_engine);
+}
 
 
 enum class Action {
@@ -33,6 +44,28 @@ enum class Card : int {
   queen,
   king,
 };
+
+
+std::ostream& operator<<(std::ostream& os, const Card& card) {
+  switch (card) {
+    case Card::jack: os << "Jack"; break;
+    case Card::queen: os << "Queen"; break;
+    case Card::king: os << "King"; break;
+    default: throw std::runtime_error("This should never happen!");
+  }
+
+  return os;
+}
+
+
+std::vector<Card> shuffle() {
+  std::vector<Card> cards = {Card::jack, Card::queen, Card::king};
+  static std::default_random_engine random_engine(
+    std::chrono::system_clock::now().time_since_epoch().count());
+  std::shuffle(cards.begin(), cards.end(), random_engine);
+
+  return cards;
+}
 
 
 bool
@@ -226,32 +259,130 @@ Action naive(const std::vector<Action>& actions, const Card& card) {
       break;
   }
 }
+
+template<uint enumerator, uint denominator>
+Action kuhn(const std::vector<Action>& actions, const Card& card) {
+  assert(denominator > 0);
+  double alpha = static_cast<double>(enumerator) /
+                 static_cast<double>(denominator);
+  bool is_alice = actions.size() % 2 == 0;
+  bool is_facing_bet{false};
+
+  if (is_alice) {
+    is_facing_bet = (actions.size() == 2) && actions[1] == Action::bet;
+    switch (card) {
+      case Card::jack:
+        if (is_facing_bet) {
+          return Action::fold;
+        } else {
+          return random() < alpha ?
+                 Action::bet : Action::check;
+        }
+        break;
+      case Card::queen:
+        if (is_facing_bet) {
+          return random() < alpha ?
+                 Action::call : Action::fold;
+          return Action::call;
+        } else {
+          return Action::check;
+        }
+        return is_facing_bet ? Action::call : Action::check;
+        break;
+      case Card::king:
+        if (is_facing_bet) {
+          return Action::call;
+        } else {
+          return random() < 3 * alpha ?
+                 Action::bet : Action::check;
+        }
+        break;
+      default:
+        throw std::runtime_error("This should never happen!");
+        break;
+    }
+  } else {
+    is_facing_bet = (actions.size() == 1) && actions[0] == Action::bet;
+    switch (card) {
+      case Card::jack:
+        if (is_facing_bet) {
+          return Action::fold;
+        } else {
+          return random() < 1./3. ?
+                 Action::bet : Action::check;
+        }
+        break;
+      case Card::queen:
+        if (is_facing_bet) {
+          return random() < 1./3. ?
+                 Action::call : Action::fold;
+        } else {
+          return Action::check;
+        }
+        break;
+      case Card::king:
+        return is_facing_bet ? Action::call : Action::bet;
+        break;
+      default:
+        throw std::runtime_error("This should never happen!");
+        break;
+    }
+  }
+
+  throw std::runtime_error("This should never happen!");
+}
+
 };  // namespace strategy
 
 };  // namespace
 
 
 int main() {
-  int stack{0};
+  const bool verbose{false};
+  size_t wins{0}, losses{0};
+  int total_stack{0};
 
-  for (size_t hand{0}; hand < 10; hand++) {
-    int wins{0};
-    if (hand % 2 == 0) {
-      wins = std::get<0>(play_round(Card::queen,
-                                    Card::jack,
-                                    &strategy::naive,
-                                    &strategy::naive,
-                                    true));
-    } else {
-      wins = std::get<1>(play_round(Card::king,
-                                    Card::queen,
-                                    &strategy::naive,
-                                    &strategy::naive,
-                                    true));
+  for (size_t round{0}; round < 1000; round++) {
+    int stack{0};
+    for (size_t hand{0}; abs(stack) < 100; hand++) {
+      auto cards = shuffle();
+      int wins{0};
+      if (hand % 2 == 0) {  // we are Alice
+        wins = std::get<0>(play_round(cards[0],
+                                      cards[1],
+                                      &strategy::kuhn<1, 3>,
+                                      &strategy::naive,
+                                      verbose));
+      } else {  // we are Bob
+        wins = std::get<1>(play_round(cards[0],
+                                      cards[1],
+                                      &strategy::naive,
+                                      &strategy::kuhn<1, 3>,
+                                      verbose));
+      }
+      stack += wins;
+      if (verbose) {
+        std::cout << "Hand: " << std::setw(5) << hand
+                  << "  Wins: " << std::setw(5) << wins
+                  << "  Stack: " << std::setw(5) << stack << std::endl;
+      }
     }
-    stack += wins;
-    std::cout << "Hand: " << std::setw(5) << hand
+    total_stack += stack;
+
+
+    if (stack > 0) {
+      wins++;
+    } else {
+      losses++;
+    }
+
+    std::cout << "Round: " << std::setw(5) << round
               << "  Wins: " << std::setw(5) << wins
               << "  Stack: " << std::setw(5) << stack << std::endl;
   }
+
+  std::cout << "Wins: " << std::setw(5) << wins
+            << "\nLosses: " << std::setw(5) << losses
+            << "\nTotal Stack: " << std::setw(5) << total_stack
+            << std::endl;
 }
