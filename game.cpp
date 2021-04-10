@@ -223,16 +223,10 @@ play_round(const Card& alice_card,
     return {-alice_bets, alice_bets};
   }
 }
-// TODO(stefan.mesken): define game
-// TODO(stefan.mesken): logging
-// TODO(stefan.mesken): simulate EV
+
 
 namespace strategy {
-// TODO(stefan.mesken): define strategy
-/*
-A strategy is a function
-(bets, position?, card) -> Action
-*/
+
 
 Action naive(const std::vector<Action>& actions, const Card& card) {
   bool is_alice = actions.size() % 2 == 0;
@@ -259,6 +253,7 @@ Action naive(const std::vector<Action>& actions, const Card& card) {
       break;
   }
 }
+
 
 template<uint enumerator, uint denominator>
 Action kuhn(const std::vector<Action>& actions, const Card& card) {
