@@ -341,10 +341,13 @@ int main() {
   const bool verbose{false};
   size_t wins{0}, losses{0};
   int total_stack{0};
+  size_t total_hands{0};
 
-  for (size_t round{0}; round < 1000; round++) {
+  for (size_t round{0}; round < 10000; round++) {
     int stack{0};
-    for (size_t hand{0}; abs(stack) < 100; hand++) {
+    size_t hand{0};
+    for ( ; hand < 200; hand++) {
+      total_hands++;
       auto cards = shuffle();
       int wins{0};
       if (hand % 2 == 0) {  // we are Alice
@@ -364,7 +367,8 @@ int main() {
       if (verbose) {
         std::cout << "Hand: " << std::setw(5) << hand
                   << "  Wins: " << std::setw(5) << wins
-                  << "  Stack: " << std::setw(5) << stack << std::endl;
+                  << "  Stack: " << std::setw(5) << stack
+                  << std::endl;
       }
     }
     total_stack += stack;
@@ -378,11 +382,16 @@ int main() {
 
     std::cout << "Round: " << std::setw(5) << round
               << "  Wins: " << std::setw(5) << wins
-              << "  Stack: " << std::setw(5) << stack << std::endl;
+              << "  Stack: " << std::setw(5) << stack
+              << "  Hands: " << std::setw(5) << hand
+              << std::endl;
   }
 
   std::cout << "Wins: " << std::setw(5) << wins
             << "\nLosses: " << std::setw(5) << losses
-            << "\nTotal Stack: " << std::setw(5) << total_stack
+            << "\nTotal Wins: " << std::setw(5) << total_stack
+            << "\nWins Per hand: " << std::setw(5)
+            << static_cast<double>(total_stack) /
+               static_cast<double>(total_hands)
             << std::endl;
 }
