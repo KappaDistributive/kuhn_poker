@@ -1,5 +1,6 @@
 #include <array>
 #include <cassert>
+#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -13,6 +14,18 @@ enum class Action {
   call,
   bet,
 };
+
+std::ostream& operator<<(std::ostream& os, const Action& action) {
+  switch (action) {
+    case Action::fold: os << "Fold"; break;
+    case Action::check: os << "Check"; break;
+    case Action::call: os << "Call"; break;
+    case Action::bet: os << "Bet"; break;
+    default: throw std::runtime_error("This should never happen!"); break;
+  }
+
+  return os;
+}
 
 
 enum class Card : int {
@@ -138,9 +151,10 @@ std::pair<int, int>
 play_round(const Card& alice_card,
            const Card& bob_card,
            Action(*alice_strategy)
-             (const std::vector<Action>& moves, const Card& card),
+             (const std::vector<Action>& actions, const Card& card),
            Action(*bob_strategy)
-             (const std::vector<Action>& moves, const Card& card)) {
+             (const std::vector<Action>& actions, const Card& card),
+           bool verbose = false) {
   std::vector<Action> actions;
 
   for (size_t move{0}; move < 4; move++) {
@@ -151,15 +165,26 @@ play_round(const Card& alice_card,
       action = bob_strategy(actions, bob_card);
     }
     actions.push_back(action);
-    if (action == Action::fold) {
+    if (actions_are_complete(actions)) {
       break;
     }
   }
   assert(actions_are_legal(actions));
   assert(actions_are_complete(actions));
   auto [alice_bets, bob_bets] = calculate_bets(actions, false);
+  auto alice_has_won = alice_won(actions, alice_card, bob_card, false);
 
-  if (alice_won(actions, alice_card, bob_card, false)) {
+  if (verbose) {
+    std::cout << "Actions: [";
+    for (auto it = actions.begin(); it != actions.end(); it++) {
+      std::cout << *it;
+      if (std::next(it) != actions.end()) {
+        std::cout << ", ";
+      }
+    }
+    std::cout << "]" << std::endl;
+  }
+  if (alice_has_won) {
     return {bob_bets, -bob_bets};
   } else {
     return {-alice_bets, alice_bets};
@@ -176,12 +201,57 @@ A strategy is a function
 (bets, position?, card) -> Action
 */
 
-// Action naive(const std::vector<int>& bets, )
+Action naive(const std::vector<Action>& actions, const Card& card) {
+  bool is_alice = actions.size() % 2 == 0;
+  bool is_facing_bet{false};
+
+  if (is_alice) {
+    is_facing_bet = (actions.size() == 2) && actions[1] == Action::bet;
+  } else {
+    is_facing_bet = (actions.size() == 1) && actions[0] == Action::bet;
+  }
+
+  switch (card) {
+    case Card::jack:
+      return is_facing_bet ? Action::fold : Action::check;
+      break;
+    case Card::queen:
+      return is_facing_bet ? Action::call : Action::check;
+      break;
+    case Card::king:
+      return is_facing_bet ? Action::call : Action::bet;
+      break;
+    default:
+      throw std::runtime_error("This should never happen!");
+      break;
+  }
+}
 };  // namespace strategy
 
 };  // namespace
 
 
 int main() {
-  std::cout << (Card::queen < Card::king) << std::endl;
+  int stack{0};
+
+  for (size_t hand{0}; hand < 10; hand++) {
+    int wins{0};
+    if (hand % 2 == 0) {
+      wins = std::get<0>(play_round(Card::queen,
+                                    Card::jack,
+                                    &strategy::naive,
+                                    &strategy::naive,
+                                    true));
+    } else {
+      wins = std::get<1>(play_round(Card::king,
+                                    Card::queen,
+                                    &strategy::naive,
+                                    &strategy::naive,
+                                    true));
+    }
+    stack += wins;
+    std::cout << "Hand: " << std::setw(5) << hand
+              << "  Wins: " << std::setw(5) << wins
+              << "  Stack: " << std::setw(5) << stack << std::endl;
+  }
 }
