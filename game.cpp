@@ -531,16 +531,17 @@ int main() {
                static_cast<double>(total_hands)
             << std::endl;
 
-  std::ofstream output_file;
-  output_file.open("../data/kuhn__vs__counter_exploit.txt");
-  for (auto game : history) {
-    for (auto it = game.begin(); it != game.end(); it++) {
-      output_file << *it;
-      if (std::next(it) != game.end()) {
-        output_file << ",";
-      }
-    }
-    output_file << "\n";
-  }
-  output_file.close();
+  /* std::ofstream output_file;
+  * output_file.open("../data/kuhn__vs__counter_exploit.txt");
+  * for (auto game : history) {
+  *   for (auto it = game.begin(); it != game.end(); it++) {
+  *     output_file << *it;
+  *     if (std::next(it) != game.end()) {
+  *       output_file << ",";
+  *     }
+  *   }
+  *   output_file << "\n";
+  * }
+  * output_file.close();
+  */
 }
