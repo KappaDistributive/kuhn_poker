@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <vector>
@@ -227,6 +228,24 @@ play_round(const Card& alice_card,
 
 namespace strategy {
 
+Action randomized(const std::vector<Action>& actions, const Card& card) {
+  bool is_alice = actions.size() % 2 == 0;
+  bool is_facing_bet{false};
+
+  if (is_alice) {
+    is_facing_bet = (actions.size() == 2) && actions[1] == Action::bet;
+  } else {
+    is_facing_bet = (actions.size() == 1) && actions[0] == Action::bet;
+  }
+
+  if (is_facing_bet) {
+    return random() < 0.5 ? Action::call : Action::fold;
+  } else {
+    return random() < 0.5 ? Action::bet : Action::check;
+  }
+
+  throw std::runtime_error("This should never happen!");
+}
 
 Action naive(const std::vector<Action>& actions, const Card& card) {
   bool is_alice = actions.size() % 2 == 0;
@@ -254,6 +273,124 @@ Action naive(const std::vector<Action>& actions, const Card& card) {
   }
 }
 
+
+Action exploit_naive(const std::vector<Action>& actions, const Card& card) {
+  bool is_alice = actions.size() % 2 == 0;
+  bool is_facing_bet{false};
+
+  if (is_alice) {
+    is_facing_bet = (actions.size() == 2) && actions[1] == Action::bet;
+  } else {
+    is_facing_bet = (actions.size() == 1) && actions[0] == Action::bet;
+  }
+
+  if (is_alice) {
+    is_facing_bet = (actions.size() == 2) && actions[1] == Action::bet;
+    switch (card) {
+      case Card::jack:
+        if (is_facing_bet) {
+          return Action::fold;
+        } else {
+          return Action::check;
+        }
+        break;
+      case Card::queen:
+        return is_facing_bet ? Action::fold : Action::check;
+        break;
+      case Card::king:
+        return is_facing_bet ? Action::call : Action::bet;
+        break;
+      default:
+        throw std::runtime_error("This should never happen!");
+        break;
+    }
+  } else {
+    is_facing_bet = (actions.size() == 1) && actions[0] == Action::bet;
+    switch (card) {
+      case Card::jack:
+        if (is_facing_bet) {
+          return Action::fold;
+        } else {
+          return Action::check;
+        }
+        break;
+      case Card::queen:
+        if (is_facing_bet) {
+          return Action::fold;
+        } else {
+          return Action::check;
+        }
+        break;
+      case Card::king:
+        return is_facing_bet ? Action::call : Action::bet;
+        break;
+      default:
+        throw std::runtime_error("This should never happen!");
+        break;
+    }
+  }
+
+  throw std::runtime_error("This should never happen!");
+}
+
+Action counter_exploit(const std::vector<Action>& actions, const Card& card) {
+  bool is_alice = actions.size() % 2 == 0;
+  bool is_facing_bet{false};
+
+  if (is_alice) {
+    is_facing_bet = (actions.size() == 2) && actions[1] == Action::bet;
+  } else {
+    is_facing_bet = (actions.size() == 1) && actions[0] == Action::bet;
+  }
+
+  if (is_alice) {
+    is_facing_bet = (actions.size() == 2) && actions[1] == Action::bet;
+    switch (card) {
+      case Card::jack:
+        if (is_facing_bet) {
+          return Action::fold;
+        } else {
+          return Action::bet;
+        }
+        break;
+      case Card::queen:
+        return is_facing_bet ? Action::call: Action::check;
+        break;
+      case Card::king:
+        return is_facing_bet ? Action::call : Action::check;
+        break;
+      default:
+        throw std::runtime_error("This should never happen!");
+        break;
+    }
+  } else {
+    is_facing_bet = (actions.size() == 1) && actions[0] == Action::bet;
+    switch (card) {
+      case Card::jack:
+        if (is_facing_bet) {
+          return Action::fold;
+        } else {
+          return Action::bet;
+        }
+        break;
+      case Card::queen:
+        if (is_facing_bet) {
+          return Action::call;
+        } else {
+          return Action::check;
+        }
+        break;
+      case Card::king:
+        return is_facing_bet ? Action::call : Action::check;
+        break;
+      default:
+        throw std::runtime_error("This should never happen!");
+        break;
+    }
+  }
+
+  throw std::runtime_error("This should never happen!");
+}
 
 template<uint enumerator, uint denominator>
 Action kuhn(const std::vector<Action>& actions, const Card& card) {
@@ -335,12 +472,15 @@ Action kuhn(const std::vector<Action>& actions, const Card& card) {
 int main() {
   const bool verbose{false};
   size_t wins{0}, losses{0};
-  int total_stack{0};
   size_t total_hands{0};
+  std::vector<std::vector<int>> history;
 
-  for (size_t round{0}; round < 10000; round++) {
+  for (size_t round{0}; round < 10; round++) {
+    history.push_back({0});
     int stack{0};
     size_t hand{0};
+    auto hero_strategy = &strategy::kuhn<1, 3>;
+    auto villain_strategy = &strategy::counter_exploit;
     for ( ; hand < 200; hand++) {
       total_hands++;
       auto cards = shuffle();
@@ -348,17 +488,18 @@ int main() {
       if (hand % 2 == 0) {  // we are Alice
         wins = std::get<0>(play_round(cards[0],
                                       cards[1],
-                                      &strategy::kuhn<1, 3>,
-                                      &strategy::naive,
+                                      hero_strategy,
+                                      villain_strategy,
                                       verbose));
       } else {  // we are Bob
         wins = std::get<1>(play_round(cards[0],
                                       cards[1],
-                                      &strategy::naive,
-                                      &strategy::kuhn<1, 3>,
+                                      villain_strategy,
+                                      hero_strategy,
                                       verbose));
       }
       stack += wins;
+      history.back().push_back(stack);
       if (verbose) {
         std::cout << "Hand: " << std::setw(5) << hand
                   << "  Wins: " << std::setw(5) << wins
@@ -366,8 +507,6 @@ int main() {
                   << std::endl;
       }
     }
-    total_stack += stack;
-
 
     if (stack > 0) {
       wins++;
@@ -381,7 +520,9 @@ int main() {
               << "  Hands: " << std::setw(5) << hand
               << std::endl;
   }
-
+  auto total_stack = std::accumulate(history.back().begin(),
+                                     history.back().end(),
+                                     0);
   std::cout << "Wins: " << std::setw(5) << wins
             << "\nLosses: " << std::setw(5) << losses
             << "\nTotal Wins: " << std::setw(5) << total_stack
@@ -389,4 +530,17 @@ int main() {
             << static_cast<double>(total_stack) /
                static_cast<double>(total_hands)
             << std::endl;
+
+  std::ofstream output_file;
+  output_file.open("../data/kuhn__vs__counter_exploit.txt");
+  for (auto game : history) {
+    for (auto it = game.begin(); it != game.end(); it++) {
+      output_file << *it;
+      if (std::next(it) != game.end()) {
+        output_file << ",";
+      }
+    }
+    output_file << "\n";
+  }
+  output_file.close();
 }
